@@ -1,5 +1,3 @@
-import glob
-import json
 import re
 import os
 from typing import Literal
@@ -10,14 +8,12 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
-from .contracts import JobData
 
 extract_number_pattern = re.compile(r"\D*(\d*)\D*")
 
-class Extractor():
+class Driver():
 	def __init__(
 			self,
-			job_data:JobData|None=None,
 			logger:Logger | None = None,
 			disable_extension=True,
 			headless=True,
@@ -35,22 +31,7 @@ class Extractor():
 			"user_data_dir": user_data_dir
 		}
 		self.driver = self.setup_webdriver(**self.driver_options)
-		Path(os.environ["BACKUP_FOLDER"]).mkdir(exist_ok=True)
 		self.logger = logger if logger else getLogger()
-		self.job_data = job_data
-		"""
-		self.state
-		This value is exclusively used to save the current state (progress).
-		Schema:
-		{
-			"stage": either crawling_links_list or scrapping_each_link,
-			"data": if stage = crawling_links_list -> data is the last page
-				if stage = scrapping_each_link -> data is the last job_id
-			"attempt": number of times the state is accessed. Used for limit the 
-				persistence
-		}
-		"""
-		self.state: dict|None = self.read_state()
 
 
 	def re_init_driver(self):
@@ -105,7 +86,6 @@ class Extractor():
 			else:
 				raise Exception("Webdriver Exception:",e.msg)
 
-
 	def take_screenshot(self,file_type:Literal["b64","png"]="b64"):
 		img_file_name = f"{datetime.now().isoformat(timespec='seconds')}"
 		folder = os.environ["SCREENSHOT_FOLDER"]
@@ -122,47 +102,19 @@ class Extractor():
 		self.logger.debug(f"Screenshot taken: {img_file_name}.{file_type}")
 		return True
 	
-	def read_state(self) -> dict|None:
-		file_path = f"{os.environ['BACKUP_FOLDER']}/{os.environ['SCRAP_STATE_FILE']}"
-		
-		if not os.path.exists(file_path):
-			self.logger.debug(f"No state file existed at {file_path}")
-			return None
-		
-		with open(file_path,"r") as f:
-			self.logger.debug(f"State file exists at {file_path}\nState={f.read()}")
-			f.seek(0)
-			return json.load(f)
-		
-	def set_state(self,state:dict|None=None):
-		accepted_keys = ["stage","data","attempt","query"]
-		if self.state is None:
-			self.state = {}
-		if state is not None:
-			for key,val in state.items():
-				if key not in accepted_keys:
-					raise Exception("Illegal state key is set.")
-			self.state[key] = val
-
-		file_path = f"{os.environ['BACKUP_FOLDER']}/{os.environ['SCRAP_STATE_FILE']}"
-		with open(file_path,"w") as f:
-			json.dump(self.state,f)
-			# Since it's too frequent we won't catch it even at debug level. We set it to sub DEBUG (<10)
-			self.logger.log(msg=f"State file is written at {file_path}",level=8)
-	
-	def del_state_and_backup(self):
-		self.logger.debug(f"Deleting the state and backup files")
-		folder = os.environ['BACKUP_FOLDER']
-		if not os.path.exists(folder):
-			self.logger.error("The backup folder does not exist!")
-		# Get a list of all files in the folder
-		files = glob.glob(folder + "/*")
-		# Iterate over the list of files and remove each one
-		for file in files:
-			if os.path.isfile(file):
-				self.logger.debug(f"Removing {file}")
-				os.remove(file)
-		self.state = None
-
-	def run_sequence(self):
-		pass
+	def find_elements(self,value:str,by:Literal["ID","XPATH","CLASS"]="XPATH",just_one:bool=True):
+		match by:
+			case "ID":
+				sby = By.ID
+			case "XPATH":
+				sby = By.XPATH
+			case "CLASS":
+				sby = By.CLASS_NAME
+			case _:
+				raise Exception("Unexpected 'by' value is entered")
+		els = self.driver.find_elements(by=sby,value=value)
+		if len(els) > 0:
+			if just_one:
+				return els[0]
+			return els
+		return None

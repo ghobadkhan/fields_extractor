@@ -12,7 +12,10 @@ from src.contracts import JobData, Singleton
 HEADLESS = True
 LOAD_TIMEOUT = 50
 USER_DATA_DIR = os.environ['CHROME_PROFILE']
-
+dotenv.load_dotenv(".env")
+logging_config_file_name = "src/logging_local.yml"
+with open(logging_config_file_name, 'r') as logging_config_file:
+    config.dictConfig(yaml.load(logging_config_file, Loader=yaml.FullLoader))
 
 class Runner(metaclass=Singleton):
     _logger: Logger
@@ -20,7 +23,6 @@ class Runner(metaclass=Singleton):
 
     def __init__(self):
         # Load environment variables
-        dotenv.load_dotenv(".env")
         # Initialize logger config
         for folder in [
             os.environ["LOG_FOLDER"],
@@ -28,9 +30,6 @@ class Runner(metaclass=Singleton):
             os.environ["OUTPUT_FOLDER"]
             ]:
             Path(folder).mkdir(exist_ok=True)
-        logging_config_file_name = "src/logging_local.yml"
-        with open(logging_config_file_name, 'r') as logging_config_file:
-            config.dictConfig(yaml.load(logging_config_file, Loader=yaml.FullLoader))
         self._logger = getLogger("extract")
         # Initialize database
         self._job_data = DB(db_name=os.environ["DB_NAME"],output_folder=os.environ['OUTPUT_FOLDER'])
