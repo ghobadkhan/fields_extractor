@@ -79,40 +79,29 @@ def my_information(driver: WebDriver):
                 print(e)
             sleep(1)
 
-def my_experience(driver: WebDriver):
-    section_name_map = {
-        "workExperienceSection": "work_experience",
-        "educationSection": "education",
-        # "languageSection": "language",
-        # "skillsSection": "skills",
-        # "resumeSection": "resume",
-        # "websiteSection": "website",
-        # "socialNetworkSection": "social_network"
-    }
+def my_experience(driver: WebDriver,website='myworkday'):
 
-    sections = driver.find_elements("xpath","//div[contains(@data-automation-id,'Section') and not(@class)]")
     definitions = json.load(open("src/routines/experience_definitions.json"))
-    chain = ActionChains(driver)
+    sections = definitions["key_map"][website]
     
-    def perform_filling(chain:ActionChains, section:WebElement, section_name:str):
+    def perform_filling(section_name:str, sequence: dict):
         data = definitions[section_name]["data"]
-        sequence = definitions["key_map"]["myworkday"][section_name]
-        add_btn = section.find_element("xpath",".//button[contains(@data-automation-id,'Add')]")
+        active_element = driver.find_element('xpath',"//body")
+        chain_obj = ActionChains(driver)
+        make_chain(chain_obj,{},sequence["meta"],active_element,0.5)
+        chain_obj.perform()
+        # active_element = active_element.find_element('xpath',"//div[contains(@data-automation-id,'skillsSection') and not(@class)]//input")
+        # chain_obj.move_to_element(active_element).scroll_by_amount(0,150).pause(1).perform()
+        # add_btn = element.find_element("xpath",".//button[contains(@data-automation-id,'Add')]")
         for d in data:
-            make_chain(chain,add_btn,d,sequence)
-            chain.perform()
-            sleep(2)
-            add_btn = driver.switch_to.active_element
+            print(active_element.get_attribute("id"))
+            make_chain(chain_obj,d,sequence["actions"],active_element,0.5)
+            chain_obj.perform()
+        chain_obj.reset_actions()
 
-    for section in sections:
-        section_attr = section.get_attribute('data-automation-id')
-        assert section_attr
-        section_name = section_name_map.get(section_attr)
-        if section_name is None:
-            continue
-        perform_filling(chain,section,section_name)
+    for section_name, sequence in sections.items():
+        perform_filling(section_name,sequence)
         sleep(2)
-
 
 
 # *** End Fill Pages ***
@@ -128,10 +117,6 @@ def fill_multi_select_container(el:WebElement,data_automation_id:str, value:str)
             search_box.send_keys(Keys.ENTER)
             sleep(1)
             container.find_element(by="xpath",value="//div[contains(@data-automation-id,'promptLeafNode')]").click()
-
-# def get_labels(el:WebElement):
-#     labels = el.find_elements(by="xpath",value=f".//label")
-#     return [l.text for l in labels]
 
 
 def select_radio_button(el:WebElement, value:str):
@@ -183,34 +168,42 @@ def populate_exp_sections(el:WebDriver, section_id:str, info:list):
     add_btn = el.find_element("xpath",".//button[contains(@data-automation-id,'Add')]")
     add_btn.click()
 
-def make_chain(chain:ActionChains, el:WebElement, data:dict, sequence:List[str]):
-    chain.move_to_element(el)
-    def key_actions(action:str):
+def make_chain(chain_obj:ActionChains, data:dict, actions:List[str],active_element:WebElement,pause:float|None=None):
+
+    for action in actions:
         match action:
             case "CLICK":
-                chain.click()
+                chain_obj.click()
+            case "CLICK_EL":
+                chain_obj.click(active_element)
             case "TAB":
-                chain.send_keys(Keys.TAB)
+                chain_obj.send_keys(Keys.TAB)
             case "ENTER":
-                chain.send_keys(Keys.ENTER)
+                chain_obj.send_keys(Keys.ENTER)
             case "SPACE":
-                chain.send_keys(Keys.SPACE)
+                chain_obj.send_keys(Keys.SPACE)
+            case "MOVE":
+                chain_obj.move_to_element(active_element)
+            case "SCROLL":
+                chain_obj.scroll_to_element(active_element)
             case action if action.find("?")!=-1:
                 command, what = action.split("?")
                 match command:
                     case "WAIT":
-                        chain.pause(float(what))
+                        chain_obj.pause(float(what))
                     case "SEND":
-                        chain.send_keys(what)
+                        chain_obj.send_keys(what)
+                    case "ELEMENT":
+                            active_element = active_element.find_element('xpath',what)
+                    case "SCROLL":
+                        chain_obj.scroll_by_amount(delta_x=0,delta_y=int(what))
                     case _:
-                        raise Exception("Undefined command name in chan")
+                        raise Exception("Unexpected command name in chain")
             case _:
                 # For description, since it is multiline we have a list of lines:
                 if type(data[action]) == str:
-                    chain.send_keys(data[action])
+                    chain_obj.send_keys(data[action])
                 elif type(data[action]) == list:
-                    chain.send_keys("\n".join(data[action]))
-
-            
-    for action in sequence:
-        key_actions(action)
+                    chain_obj.send_keys("\n".join(data[action]))
+        if pause:
+            chain_obj.pause(pause)

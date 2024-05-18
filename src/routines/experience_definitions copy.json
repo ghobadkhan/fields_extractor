@@ -54,10 +54,41 @@
     },
     "key_map": {
         "myworkday": {
+            "work_experience": {
+                "meta": [
+                    "ELEMENT?//div[contains(@data-automation-id,'workExperienceSection') and not(@class)]",
+                    "ELEMENT?.//button[contains(@data-automation-id,'Add')]",
+                    "MOVE",
+                    "CLICK_EL","WAIT?1"
+                ],
+                "actions": [
+                    "ENTER", "WAIT?1",
+                    "job_title","TAB",
+                    "company","TAB",
+                    "location","TAB","TAB",
+                    "from_month","from_year","TAB","TAB",
+                    "to_month","to_year","TAB","TAB",
+                    "description","TAB","WAIT?5"
+                ]
+            },
+            "education": {
+                "meta": [
+                    "ELEMENT?//div[contains(@data-automation-id,'educationSection') and not(@class)]",
+                    "ELEMENT?.//button[contains(@data-automation-id,'Add')]",
+                    "MOVE",
+                    "CLICK_EL","WAIT?1"
+                ],
+                "actions": [
+                    "CLICK", "WAIT?1",
+                    "university", "ENTER", "WAIT?2", "ENTER", "TAB",
+                    "degree", "TAB",
+                    "major", "SPACE", "field", "ENTER"
+                ]
+            },
             "skills": {
                 "meta": [
                     "ELEMENT?//div[contains(@data-automation-id,'skillsSection') and not(@class)]//input",
-                    "MOVE","SCROLL?150"
+                    "MOVE","SCROLL?400","ENTER"
                 ],
                 "actions": [
                     "CLICK_EL","WAIT?1","skill","ENTER"
