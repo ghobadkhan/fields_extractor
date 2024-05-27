@@ -12,51 +12,75 @@ import re
 class Routine:
     base_url_pattern = re.compile(r"https?:\/\/(.*\.)?(.*\..*?)\/.*")
 
-    def __init__(self, driver: WebDriver, def_address:str="db/experience_definitions.json") -> None:
+    def __init__(self, driver: WebDriver,url:str, def_address:str="db/experience_definitions.json") -> None:
         self.driver = driver
         self.current_element: WebElement|None = None
+        self.url = url
+        self.base_url = self.base_url_pattern.findall(self.url)[0][-1]
         self.my_information_fields = {
-            "formField-sourcePrompt": lambda el: self.fill_multi_select_container(el,"formField-sourcePrompt","a"),
-            "formField-":lambda el: self.select_radio_button(el,"No"),
+            "formField-sourcePrompt": lambda el: self._fill_multi_select_container(el,"formField-sourcePrompt","a"),
+            "formField-":lambda el: self._select_radio_button(el,"No"),
             "formField-countryDropdown":None,
-            "formField-legalNameSection_firstName":lambda el: self.fill_simple_text_input(el,"Ahamad"),
-            "formField-legalNameSection_lastName":lambda el: self.fill_simple_text_input(el,"Noori"),
+            "formField-legalNameSection_firstName":lambda el: self._fill_simple_text_input(el,"Ahamad"),
+            "formField-legalNameSection_lastName":lambda el: self._fill_simple_text_input(el,"Noori"),
             "formField-formField-preferredNameCheckbox":None,
-            "formField-addressSection_addressLine1":lambda el: self.fill_simple_text_input(el,"Your Mama's Home"),
-            "formField-addressSection_city":lambda el: self.fill_simple_text_input(el,"Toronto"),
-            "formField-addressSection_countryRegion":lambda el: self.select_dropdown(el,"Ontario"),
-            "formField-addressSection_postalCode":lambda el: self.fill_simple_text_input(el,"M2M 1E1"),
+            "formField-addressSection_addressLine1":lambda el: self._fill_simple_text_input(el,"Your Mama's Home"),
+            "formField-addressSection_city":lambda el: self._fill_simple_text_input(el,"Toronto"),
+            "formField-addressSection_countryRegion":lambda el: self._select_dropdown(el,"Ontario"),
+            "formField-addressSection_postalCode":lambda el: self._fill_simple_text_input(el,"M2M 1E1"),
             "formField-email":None,
             "formField-phone-device-type":None,
             "formField-country-phone-code":None,
-            "formField-phone-number":lambda el: self.fill_simple_text_input(el,"4166969699"),
+            "formField-phone-number":lambda el: self._fill_simple_text_input(el,"4166969699"),
             "formField-phone-extension":None
         }
         self.definitions = json.load(open(def_address))
         
 
+    # ****** Actions *******
 
-    def get_creds(self,base_url:str):
+    def goto_url(self):
+        self.driver.get(self.url)
+        return self
+
+    def get_creds(self):
+        assert self.base_url
         with open("db/creds.csv","r") as f:
             f.readline()
             for line in f:
                 fields = line.rstrip().split(",")
-                if fields[0].find(base_url) != -1:
-                    return fields[1:]
-        return None, None
-
-    def run(self, url:str):
-        base_url = self.base_url_pattern.findall(url)[0][-1]
-        usr, passwd = self.get_creds(base_url)
-        assert usr and passwd
-        sleep(2)
-        self.sign_in(usr,passwd)
-        sleep(2)
+                if fields[0].find(self.base_url) != -1:
+                    self.usr, self.passwd = fields[1:]
+                    return self
+        raise Exception(f"Could not find user and password for base url: {self.base_url}")
+    
+    def pause(self,duration:float=1):
+        sleep(duration)
+        return self
+    
+    def refresh(self):
         self.driver.refresh()
-        self.my_information()
-        self.find_submit_or_next_btn().click()
-        sleep(2)
-        self.my_experience()
+        return self
+    
+    def sign_in(self):
+        self._perform_sign_in(self.usr,self.passwd)
+        return self
+    
+    def my_information(self):
+        self._fill_my_information()
+        return self
+    
+    def find_click_submit_btn(self):
+        self._find_submit_or_next_btn().click()
+        return self
+    
+    def my_experience(self):
+        self._fill_my_experience()
+        return self
+    
+    # ****** End of Actions *******
+        
+    # def run(self, url:str):
         # current_page = self.get_progress()['current']
         # match current_page:
         #     case "My Information":
@@ -67,7 +91,7 @@ class Routine:
     
 
     # *** Fill Pages ***
-    def sign_in(self,user:str, password:str):
+    def _perform_sign_in(self,user:str, password:str):
         sign_in_form = self.driver.find_element("xpath","//form[contains(@data-automation-id,'signInFormo')]")
         labels = sign_in_form.find_elements("xpath",".//label")
         for label in labels:
@@ -84,9 +108,10 @@ class Routine:
         btn = sign_in_form.find_element("xpath",".//div[contains(@data-automation-id,'click_filter')]")
         ActionChains(self.driver).move_to_element(btn).pause(0.5).send_keys(Keys.ENTER).pause(0.5).click().perform()
 
-    def my_information(self):
+    def _fill_my_information(self):
         #TODO: This must be integrated with the definitions json framework later 
         f_list = self.driver.find_elements("xpath","//div[contains(@data-automation-id,'formField')]")
+        print(f_list)
         for f in f_list:
             func = self.my_information_fields.get(f.get_attribute('data-automation-id')) # type: ignore
             if func is not None:
@@ -97,7 +122,7 @@ class Routine:
                     print(e)
                 sleep(1)
 
-    def find_submit_or_next_btn(self):
+    def _find_submit_or_next_btn(self):
         pattern = re.compile(r".*save|next|done|submit.*",re.IGNORECASE)
         btns = self.driver.find_elements("xpath","//button")
         for btn in btns:
@@ -108,7 +133,7 @@ class Routine:
 
     # *** End Fill Pages ***
 
-    def fill_multi_select_container(self,el:WebElement,data_automation_id:str, value:str):
+    def _fill_multi_select_container(self,el:WebElement,data_automation_id:str, value:str):
         container = el.find_element(by="xpath",value=".//*[contains(@data-automation-id,'multiselectInputContainer')]")
         match data_automation_id:
             case "formField-sourcePrompt":
@@ -121,7 +146,7 @@ class Routine:
                 container.find_element(by="xpath",value="//div[contains(@data-automation-id,'promptLeafNode')]").click()
 
 
-    def select_radio_button(self,el:WebElement, value:str):
+    def _select_radio_button(self,el:WebElement, value:str):
         radio_label = el.find_element(by="xpath",value=f".//label[text()[contains(.,'{value}')]]")
         input_id = radio_label.get_attribute("for")
         radio_btn = el.find_element(by="xpath",value=f".//input[contains(@id,'{input_id}')]")
@@ -130,7 +155,7 @@ class Routine:
         radio_btn.click()
 
     # Example: Field with label 'Province of Territory with data-automation-id=addressSection_countryRegion
-    def select_dropdown(self,el:WebElement, value:str):
+    def _select_dropdown(self,el:WebElement, value:str):
         button = el.find_element(by="xpath",value=f".//button")
         button.send_keys(Keys.ENTER)
         sleep(0.5)
@@ -138,17 +163,17 @@ class Routine:
         ll = el.find_element("xpath","//div[starts-with(@class,'wd-popup')]")
         ll.find_element("xpath",f".//*[text()[contains(.,'{value}')]]").click()
 
-    def fill_simple_text_input(self,el:WebElement,value:str):
+    def _fill_simple_text_input(self,el:WebElement,value:str):
         el.find_element("xpath",".//input").send_keys(value)
 
 
-    def get_progress(self):
+    def _get_progress(self):
         progress_bar = self.driver.find_element("xpath","//div[contains(@data-automation-id,'progressBar')]")
         levels = progress_bar.find_elements("xpath",".//div[@data-automation-id]")
         res:Dict[str,Any] = {"completed":None,"not_completed":None}
         for level in levels:
             label = level.find_element("xpath", ".//label[not(@aria-live)]").text
-            did = level.get_attribute('data-automation-id').lower()
+            did = level.get_attribute('data-automation-id').lower() #type: ignore
             match did:
                 case did if did and did.find("completed") != -1:
                     if res["completed"] is None:
@@ -167,7 +192,7 @@ class Routine:
         return res
 
 
-    def my_experience(self,website='myworkday'):
+    def _fill_my_experience(self,website='myworkday'):
 
         sections = self.definitions["key_map"][website]
 
@@ -176,30 +201,30 @@ class Routine:
             self.current_element = self.driver.find_element('xpath',"//body")
             data = self.definitions[section_name]["data"]
             # Run the sequence for meta (primer)
-            self.run_sequence(sequence["meta"],0.5)
+            self._run_sequence(sequence["meta"],0.5)
 
             # Run the sequence for repeated data
             if type(data) == list:
                 for d in data:
-                    self.run_sequence(sequence["actions"],0.5,d)
+                    self._run_sequence(sequence["actions"],0.5,d)
                     sleep(2)
             elif type(data) == dict:
-                self.run_sequence(sequence["actions"],0.5,data)
+                self._run_sequence(sequence["actions"],0.5,data)
             else:
                 raise Exception("Wrong type for data. Must be dict or list")
 
-    def run_sequence(self, actions:List[str],pause:float|None=None,data:dict|None=None):
+    def _run_sequence(self, actions:List[str],pause:float|None=None,data:dict|None=None):
         if actions[0] == "USE_MANUAL":
             actions.pop(0)
-            self.make_manual(actions,pause)
+            self._make_manual(actions,pause)
         else:
             chain_obj = ActionChains(self.driver)
-            self.make_chain(chain_obj,actions,pause,data)
+            self._make_chain(chain_obj,actions,pause,data)
             chain_obj.perform()
             chain_obj.reset_actions()
 
 
-    def make_manual(self,actions:List[str],pause:float|None=None):
+    def _make_manual(self,actions:List[str],pause:float|None=None):
         assert self.current_element is not None
         for action in actions:
             match action:
@@ -228,7 +253,7 @@ class Routine:
                 sleep(pause)
 
 
-    def make_chain(self,chain_obj:ActionChains,actions:List[str],pause:float|None=None,data:dict|None=None):
+    def _make_chain(self,chain_obj:ActionChains,actions:List[str],pause:float|None=None,data:dict|None=None):
         assert self.current_element is not None
         for action in actions:
             match action:
