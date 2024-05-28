@@ -1,10 +1,12 @@
 import os
-from typing import Any, List, Literal
+from typing import List, Literal
 from dotenv import load_dotenv
 from .driver import Driver
 from .routines.myworkday import Routine
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver import Keys, ActionChains
 from time import sleep
 
@@ -14,6 +16,10 @@ class ScannerParent:
         "radio": ('xpath',"self::input[contains(@type,'radio')]"),
         "checkbox": ('xpath',"self::input[contains(@type,'checkbox')]")
     }
+
+    def __init__(self, driver:WebDriver) -> None:
+        self.driver = driver
+        self.wait = WebDriverWait(driver=driver,timeout=10,poll_frequency=1)
 
     """Regular xpath element search"""
     @staticmethod 
@@ -52,21 +58,18 @@ class ScannerParent:
 class Scanner(ScannerParent):
     def __init__(self,driver:WebDriver,form_xpath:str) -> None:
         self.form_predicate = form_xpath
-        self.driver = driver
         self.override_input_type_mapping({
             # Contains an ancestor that has the required data-automation-id value
             "dropdown": ("xpath","self::button[contains(@aria-haspopup,'listbox')]"),
             "multiselect_input": ("case_in","ancestor::*[@data-automation-id]",'data-automation-id','multiselect'),
         })
-
-    def get_form(self):
-        self.form = self.driver.find_element('xpath',self.form_predicate)
+        super().__init__(driver)
 
     def override_input_type_mapping(self,mapping:dict):
         for i_type,definition in mapping.items():
             self.input_type_mapping[i_type] = definition
     
-    def condition_exists(self,el:WebElement,condition:List[str]):
+    def condition_true(self,el:WebElement,condition:List[str]):
         match condition[0]:
             case 'xpath':
                 return self.xpath_condition(el,*condition[1:])
@@ -77,35 +80,28 @@ class Scanner(ScannerParent):
         
     def find_input_type(self,el:WebElement):
         for i_type, condition in self.input_type_mapping.items():
-            if self.condition_exists(el,condition):
+            if self.condition_true(el,condition):
                 return i_type
         return "unknown"
     
-
     def run(self):
         self.driver.refresh()
-        sleep(2)
-        self.get_form()
+        self.wait.until(ec.presence_of_element_located(("xpath",self.form_predicate)))
         chain = ActionChains(self.driver)
-        chain.move_to_element(self.form).perform()
-        for i in range(100):
+        while self.is_in(self.driver.switch_to.active_element,"body"):
             chain.send_keys(Keys.TAB).perform()
             el = self.driver.switch_to.active_element
-            print(el.tag_name,self.find_input_type(el))
-            # self.take_screenshot(el,f"{i}-{el.tag_name}")
+            if self.is_in(el,self.form_predicate):
+                print(el.tag_name,self.find_input_type(el))
+                # self.take_screenshot(el,f"{i}-{el.tag_name}")
             sleep(0.2)
-            if not self.is_in_form():
-                print("End of form")
-                break
     
-    def is_in_form(self):
-        p = self.driver.switch_to.active_element
-        while p.tag_name != "body":
-            # Going one step up
-            p = p.find_element("xpath","..")
-            if p.id == self.form.id:
-                return True
-        return False
+    def is_in(self,p:WebElement,xpath:str):
+        try:
+            p.find_element("xpath",f"ancestor::{xpath}")
+            return True
+        except:
+            return False
 
 
 if __name__ == "__main__":
