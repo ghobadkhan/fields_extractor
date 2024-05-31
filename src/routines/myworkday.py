@@ -74,8 +74,8 @@ class Routine:
         self._find_submit_or_next_btn().click()
         return self
     
-    def my_experience(self):
-        self._fill_my_experience()
+    def my_experience(self,selected_sections:list|None=None):
+        self._fill_my_experience(selected_sections=selected_sections)
         return self
     
     # ****** End of Actions *******
@@ -192,11 +192,15 @@ class Routine:
         return res
 
 
-    def _fill_my_experience(self,website='myworkday'):
+    def _fill_my_experience(self,website='myworkday',selected_sections:list|None=None):
 
         sections = self.definitions["key_map"][website]
 
         for section_name, sequence in sections.items():
+            # If we set specific section to fill, we can use them
+            # (Only for development)
+            if selected_sections and section_name not in selected_sections:
+                continue
             # Make sure to reset current_element for each section
             self.current_element = self.driver.find_element('xpath',"//body")
             data = self.definitions[section_name]["data"]
@@ -216,7 +220,7 @@ class Routine:
     def _run_sequence(self, actions:List[str],pause:float|None=None,data:dict|None=None):
         if actions[0] == "USE_MANUAL":
             actions.pop(0)
-            self._make_manual(actions,pause)
+            self._make_manual(actions,pause,data)
         else:
             chain_obj = ActionChains(self.driver)
             self._make_chain(chain_obj,actions,pause,data)
@@ -224,7 +228,7 @@ class Routine:
             chain_obj.reset_actions()
 
 
-    def _make_manual(self,actions:List[str],pause:float|None=None):
+    def _make_manual(self,actions:List[str],pause:float|None=None,data:dict|None=None):
         assert self.current_element is not None
         for action in actions:
             match action:
@@ -248,7 +252,11 @@ class Routine:
                         case _:
                             raise Exception("Unexpected command name in run manual")
                 case _:
-                    raise Exception("Unexpected action name in run manual")
+                    assert data
+                    if type(data[action]) == str:
+                        self.current_element.send_keys(data[action])
+                    elif type(data[action]) == list:
+                        self.current_element.send_keys("\n".join(data[action]))
             if pause:
                 sleep(pause)
 

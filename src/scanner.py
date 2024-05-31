@@ -1,8 +1,6 @@
 import os
+import re
 from typing import List, Literal
-from dotenv import load_dotenv
-from .driver import Driver
-from .routines.myworkday import Routine
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
@@ -11,10 +9,12 @@ from selenium.webdriver import Keys, ActionChains
 from time import sleep
 
 class ScannerParent:
+    question_pattern = re.compile(r".{4,}\?.*")
     input_type_mapping = {
-        "text": ('xpath',"self::input[contains(@type,'text')]"),
-        "radio": ('xpath',"self::input[contains(@type,'radio')]"),
-        "checkbox": ('xpath',"self::input[contains(@type,'checkbox')]")
+        "text": ('xpath',"self::input[@type='text']"),
+        "radio": ('xpath',"self::input[@type='radio']"),
+        "checkbox": ('xpath',"self::input[@type='checkbox']"),
+        "textarea": ('xpath',"self::textarea"),
     }
 
     def __init__(self, driver:WebDriver) -> None:
@@ -63,6 +63,7 @@ class Scanner(ScannerParent):
             "dropdown": ("xpath","self::button[contains(@aria-haspopup,'listbox')]"),
             "multiselect_input": ("case_in","ancestor::*[@data-automation-id]",'data-automation-id','multiselect'),
         })
+        self.chain = ActionChains(driver)
         super().__init__(driver)
 
     def override_input_type_mapping(self,mapping:dict):
@@ -84,18 +85,135 @@ class Scanner(ScannerParent):
                 return i_type
         return "unknown"
     
-    def run(self):
+    def active_element(self) -> WebElement:
+        return self.driver.switch_to.active_element
+    
+    def press_key(self,key=Keys.TAB):
+        self.chain.send_keys(key).perform()
+        # print(f"pressed {key}")
+
+    def press_shift_tab(self):
+        self.chain.key_down(Keys.SHIFT).send_keys(Keys.TAB).perform()
+        # print("pressed shift-tab")
+    
+
+    def refresh_for_form(self):
         self.driver.refresh()
-        self.wait.until(ec.presence_of_element_located(("xpath",self.form_predicate)))
-        chain = ActionChains(self.driver)
-        while self.is_in(self.driver.switch_to.active_element,"body"):
-            chain.send_keys(Keys.TAB).perform()
-            el = self.driver.switch_to.active_element
-            if self.is_in(el,self.form_predicate):
-                print(el.tag_name,self.find_input_type(el))
+        self.wait.until(ec.presence_of_element_located(("xpath","//"+self.form_predicate)))
+    
+    def form_elements(self):
+        while not self.is_in(self.active_element(),"body"):
+            print("not in body yet")
+            self.press_key()
+        while self.is_in(self.active_element(),"body"):
+            self.press_key()
+            if self.is_in(self.active_element(),self.form_predicate):
+                yield self.active_element()
                 # self.take_screenshot(el,f"{i}-{el.tag_name}")
             sleep(0.2)
+
+    def find_text(self,el:WebElement):
+        id = el.get_attribute("id")
+        for e in self.driver.find_elements("xpath",f"//*[@for='{id}']"):
+            if e.text != "":
+                return e.text
+        
+    def find_radio_text(self,first_radio:WebElement):
+        # Find all preceding elements that contain a text and that text matches the question pattern
+        possible_text = [e.text for e in first_radio.find_elements("xpath","preceding::*[text()]") if self.question_pattern.match(e.text)]
+        if len(possible_text) > 0:
+            # Since preceding elements for closest in the last [farthest,....,closest],
+            # the last one is the possible related legend
+            text = possible_text[-1]
+        else:
+            #TODO: replace this with log or exception
+            text = None
+            print("Warning, no legend found for the radio group.")
+
+        # Each radio input can be selected with arrow keys...
+        choices = [{
+            "element": first_radio,
+            "text": self.find_text(first_radio)
+        }]
+        self.press_key(Keys.ARROW_DOWN)
+        while self.active_element() != first_radio:
+            choices.append({
+                "element": self.active_element(),
+                "text": self.find_text(self.active_element())
+            })
+            self.press_key(Keys.ARROW_DOWN)
+            sleep(0.2)
+        return text, choices
     
+    def find_checkbox_text(self,first_checkbox:WebElement):
+        """
+        First we assume that checkbox is grouped so we look for the group text.
+        The we'll check if more checkboxes are following the current checkbox (first_checkbox).
+        If we find more, we bunch them up and att the text as their group text
+        Else, we only return the info of the first_checkbox
+        """
+
+        # Find all preceding elements that contain a text and that text matches the question pattern
+        possible_text = [e.text for e in first_checkbox.find_elements("xpath","preceding::*[text()]") if self.question_pattern.match(e.text)]
+        if len(possible_text) > 0:
+            # Since preceding elements for closest in the last [farthest,....,closest],
+            # the last one is the possible related legend
+            text = possible_text[-1]
+        else:
+            #TODO: replace this with log or exception
+            text = None
+            print("Warning, no legend found for the radio group.")
+        choices = [{
+            "element": first_checkbox,
+            "text": self.find_text(first_checkbox)
+        }]
+        self.press_key()
+        while self.find_input_type(self.active_element()) == "checkbox":
+            choices.append({
+                "element": self.active_element(),
+                "text": self.find_text(self.active_element())
+            })
+            self.press_key()
+        # For some reason, if the last element is not check box, we don't
+        # need to revert to element before.
+        # self.press_shift_tab()
+        if len(choices) > 1:
+            # We have a group of checkboxes
+            return text, choices
+        else:
+            # We only one checkbox
+            return None, choices[0]
+        
+    def find_dropdown_text(self):
+        #TODO: Still under testing and must be updated. Very slow
+        choices = set()
+        for key in [Keys.ARROW_DOWN, Keys.ARROW_UP]:
+            for _ in range(5):
+                sleep(0.5)
+                self.active_element().click()
+                sleep(0.3)
+                self.press_key(key)
+                sleep(0.2)
+                self.press_key(Keys.ENTER)
+                sleep(0.2)
+                choices.add(self.active_element().text)
+
+        return list(choices)
+    
+    def reset_dropdown(self):
+        # TEMP: This is for testing of workday element only and temporary
+        inp = self.active_element().find_element("xpath","following::input")
+        self.driver.execute_script("arguments[0].removeAttribute('value')",inp)
+        self.driver.execute_script("arguments[0].innerText='select one'",self.active_element())
+
+
+    def focus(self, el:WebElement):
+        """Return focus to specific element
+        """
+        self.driver.execute_script("arguments[0].focus()",el)
+    
+
+        
     def is_in(self,p:WebElement,xpath:str):
         try:
             p.find_element("xpath",f"ancestor::{xpath}")
@@ -105,8 +223,4 @@ class Scanner(ScannerParent):
 
 
 if __name__ == "__main__":
-    load_dotenv()
-    driver = Driver(load_timeout=-1, driver_logging=False,debug_address="localhost:9222")
-    routine = Routine(driver.driver,"https://td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers/login?redirect=%2Fen-US%2FTD_Bank_Careers%2Fjob%2FMarkham%252C-Ontario%2FContact-Centre-Representative--Canadian-Banking--Easyline_R_1342984%2Fapply%2FapplyManually")
-    scanner = Scanner(driver.driver,"//div[contains(@data-automation-id,'Page')]")
-    scanner.run()
+    ...
