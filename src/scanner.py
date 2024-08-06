@@ -70,7 +70,7 @@ class Scanner(ScannerParent):
         for i_type,definition in mapping.items():
             self.input_type_mapping[i_type] = definition
     
-    def condition_true(self,el:WebElement,condition:List[str]):
+    def condition_true(self,el:WebElement,condition:tuple):
         match condition[0]:
             case 'xpath':
                 return self.xpath_condition(el,*condition[1:])
@@ -176,7 +176,7 @@ class Scanner(ScannerParent):
             self.press_key()
         # For some reason, if the last element is not check box, we don't
         # need to revert to element before.
-        # self.press_shift_tab()
+        self.press_shift_tab()
         if len(choices) > 1:
             # We have a group of checkboxes
             return text, choices
@@ -187,16 +187,18 @@ class Scanner(ScannerParent):
     def find_dropdown_text(self):
         #TODO: Still under testing and must be updated. Very slow
         choices = set()
-        for key in [Keys.ARROW_DOWN, Keys.ARROW_UP]:
-            for _ in range(5):
-                sleep(0.5)
-                self.active_element().click()
-                sleep(0.3)
-                self.press_key(key)
-                sleep(0.2)
-                self.press_key(Keys.ENTER)
-                sleep(0.2)
-                choices.add(self.active_element().text)
+        for _ in range(10):
+            sleep(0.5)
+            self.active_element().click()
+            sleep(0.3)
+            self.press_key(Keys.ARROW_DOWN)
+            sleep(0.2)
+            self.press_key(Keys.ENTER)
+            sleep(0.2)
+            text = self.active_element().text
+            if text in choices:
+                break
+            choices.add(text)
 
         return list(choices)
     
@@ -205,6 +207,7 @@ class Scanner(ScannerParent):
         inp = self.active_element().find_element("xpath","following::input")
         self.driver.execute_script("arguments[0].removeAttribute('value')",inp)
         self.driver.execute_script("arguments[0].innerText='select one'",self.active_element())
+        self.driver.execute_script("arguments[0].removeAttribute('value')",self.active_element())
 
 
     def focus(self, el:WebElement):
@@ -220,7 +223,36 @@ class Scanner(ScannerParent):
             return True
         except:
             return False
-
-
-if __name__ == "__main__":
-    ...
+        
+    def run(self):
+        results = []
+        for el in self.form_elements():
+            el_type = self.find_input_type(el)
+            field_info = {
+                "is_group": False,
+                "type": el_type,
+                "element": el,
+            }
+            match el_type: 
+                case "radio":
+                    text, choices = self.find_radio_text(el)
+                case "checkbox":
+                    text, choices = self.find_checkbox_text(el)
+                    if text:
+                        field_info["is_group"] = True
+                    else:
+                        choices = None
+                case "dropdown":
+                    text = self.find_text(el)
+                    choices = self.find_dropdown_text()
+                    # TEMP: Remove this later
+                    self.reset_dropdown()
+                case _:
+                    text = self.find_text(el)
+                    choices = None
+            results.append({
+                **field_info,
+                "text":text,
+                "choices": choices
+            })
+        return results

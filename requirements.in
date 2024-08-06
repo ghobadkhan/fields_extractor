@@ -1,0 +1,9 @@
+pandas
+python-dotenv
+PyYAML
+requests
+selenium
+webdriver-manager
+psutil
+Sphinx
+sphinx-pdj-theme

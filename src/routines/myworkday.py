@@ -12,10 +12,11 @@ import re
 class Routine:
     base_url_pattern = re.compile(r"https?:\/\/(.*\.)?(.*\..*?)\/.*")
 
-    def __init__(self, driver: WebDriver,url:str, def_address:str="db/experience_definitions.json") -> None:
+    def __init__(self, driver: WebDriver,url:str, def_address:str="db/experience_definitions.json", creds_db="db/creds.csv") -> None:
         self.driver = driver
         self.current_element: WebElement|None = None
         self.url = url
+        self.creds_db = creds_db
         self.base_url = self.base_url_pattern.findall(self.url)[0][-1]
         self.my_information_fields = {
             "formField-sourcePrompt": lambda el: self._fill_multi_select_container(el,"formField-sourcePrompt","a"),
@@ -36,6 +37,16 @@ class Routine:
         }
         self.definitions = json.load(open(def_address))
         
+    def get_creds(self):
+        assert self.base_url
+        with open(self.creds_db,"r") as f:
+            f.readline()
+            for line in f:
+                fields = line.rstrip().split(",")
+                if fields[0].find(self.base_url) != -1:
+                    usr, passwd = fields[1:]
+                    return usr, passwd 
+        raise Exception(f"Could not find user and password for base url: {self.base_url}")
 
     # ****** Actions *******
 
@@ -43,16 +54,6 @@ class Routine:
         self.driver.get(self.url)
         return self
 
-    def get_creds(self):
-        assert self.base_url
-        with open("db/creds.csv","r") as f:
-            f.readline()
-            for line in f:
-                fields = line.rstrip().split(",")
-                if fields[0].find(self.base_url) != -1:
-                    self.usr, self.passwd = fields[1:]
-                    return self
-        raise Exception(f"Could not find user and password for base url: {self.base_url}")
     
     def pause(self,duration:float=1):
         sleep(duration)
@@ -63,7 +64,8 @@ class Routine:
         return self
     
     def sign_in(self):
-        self._perform_sign_in(self.usr,self.passwd)
+        usr, passwd = self.get_creds()
+        self._perform_sign_in(usr,passwd)
         return self
     
     def my_information(self):
@@ -86,9 +88,7 @@ class Routine:
         #     case "My Information":
         #         self.my_information()
         #     case "My Experience":
-        #         self.my_experience()
-
-    
+        #         self.my_experience()    
 
     # *** Fill Pages ***
     def _perform_sign_in(self,user:str, password:str):
