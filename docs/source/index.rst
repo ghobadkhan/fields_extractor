@@ -19,4 +19,3 @@ a different project at later stages.
    
    Home <self>
    Usage <usage.rst>
-   API <api.rst>

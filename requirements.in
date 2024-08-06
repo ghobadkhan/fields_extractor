@@ -7,3 +7,4 @@ webdriver-manager
 psutil
 Sphinx
 sphinx-pdj-theme
+sphinx-autoapi

@@ -29,6 +29,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
+    "autoapi.extension"
 ]
 
 intersphinx_mapping = {
@@ -48,3 +49,4 @@ exclude_patterns = ["build"]
 html_theme = 'sphinx_pdj_theme'
 html_theme_path = [sphinx_pdj_theme.get_html_theme_path()]
 html_static_path = ['_static']
+autoapi_dirs = ['../../src']

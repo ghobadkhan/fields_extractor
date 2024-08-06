@@ -6,6 +6,8 @@
 #
 alabaster==0.7.16
     # via sphinx
+astroid==3.3.1
+    # via sphinx-autoapi
 attrs==23.2.0
     # via
     #   outcome
@@ -33,7 +35,9 @@ idna==3.7
 imagesize==1.4.1
     # via sphinx
 jinja2==3.1.4
-    # via sphinx
+    # via
+    #   sphinx
+    #   sphinx-autoapi
 markupsafe==2.1.5
     # via jinja2
 numpy==2.0.1
@@ -61,7 +65,9 @@ python-dotenv==1.0.1
 pytz==2024.1
     # via pandas
 pyyaml==6.0.1
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   sphinx-autoapi
 requests==2.32.3
     # via
     #   -r requirements.in
@@ -78,6 +84,10 @@ snowballstemmer==2.2.0
 sortedcontainers==2.4.0
     # via trio
 sphinx==7.4.7
+    # via
+    #   -r requirements.in
+    #   sphinx-autoapi
+sphinx-autoapi==3.2.1
     # via -r requirements.in
 sphinx-pdj-theme==0.4.0
     # via -r requirements.in
@@ -102,7 +112,9 @@ trio==0.26.0
 trio-websocket==0.11.1
     # via selenium
 typing-extensions==4.12.2
-    # via selenium
+    # via
+    #   astroid
+    #   selenium
 tzdata==2024.1
     # via pandas
 urllib3[socks]==2.2.2
