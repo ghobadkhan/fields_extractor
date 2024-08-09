@@ -1,14 +1,23 @@
+"""
+This module contains base class ``ScannerParent`` Parent and concrete class ``Scanner``
+
+
+"""
+
 import os
 import re
-from typing import List, Literal
+from typing import Literal
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver import Keys, ActionChains
 from time import sleep
 
 class ScannerParent:
+    """
+    Base class for scanning the web forms
+    """
     question_pattern = re.compile(r".{4,}\?.*")
     input_type_mapping = {
         "text": ('xpath',"self::input[@type='text']"),
@@ -21,22 +30,22 @@ class ScannerParent:
         self.driver = driver
         self.wait = WebDriverWait(driver=driver,timeout=10,poll_frequency=1)
 
-    """Regular xpath element search"""
     @staticmethod 
     def xpath_condition(el:WebElement,predicate:str):
+        """Regular xpath element search"""
         try:
             el.find_element("xpath",predicate)
             return True
         except:
             return False
     
-    """Case insensitive attribute value search
-    """
     @staticmethod
     def case_in(el:WebElement,predicate:str,attr:str,value:str):
+        """Case insensitive attribute value search
+        """
         elements = el.find_elements('xpath',predicate)
         for element in elements:
-            if element.get_attribute(attr).lower().find(value) != -1:
+            if element.get_attribute(attr).lower().find(value) != -1: # type: ignore
                 return True
         else:
             return False
@@ -56,6 +65,17 @@ class ScannerParent:
         return True
 
 class Scanner(ScannerParent):
+    """
+    This class implements a set of different logics to scan different elements
+    of a web page
+
+    :param driver: Instance of the selenium webdriver
+    :type driver: WebDriver
+    :param form_xpath: This is the xpath address for the body of form. This is
+        needed for the class to properly identify the target web form and not to
+        list unrelated elements
+    :type form_xpath: str
+    """
     def __init__(self,driver:WebDriver,form_xpath:str) -> None:
         self.form_predicate = form_xpath
         self.override_input_type_mapping({
@@ -119,7 +139,9 @@ class Scanner(ScannerParent):
                 return e.text
         
     def find_radio_text(self,first_radio:WebElement):
-        # Find all preceding elements that contain a text and that text matches the question pattern
+        """
+        Find all preceding elements that contain a text and that text matches the question pattern
+        """
         possible_text = [e.text for e in first_radio.find_elements("xpath","preceding::*[text()]") if self.question_pattern.match(e.text)]
         if len(possible_text) > 0:
             # Since preceding elements for closest in the last [farthest,....,closest],
@@ -147,8 +169,10 @@ class Scanner(ScannerParent):
     
     def find_checkbox_text(self,first_checkbox:WebElement):
         """
+        Find the text that's related to a checkbox or a group of checkboxes
+
         First we assume that checkbox is grouped so we look for the group text.
-        The we'll check if more checkboxes are following the current checkbox (first_checkbox).
+        Then we'll check if more checkboxes are following the current checkbox (first_checkbox).
         If we find more, we bunch them up and att the text as their group text
         Else, we only return the info of the first_checkbox
         """
@@ -225,6 +249,12 @@ class Scanner(ScannerParent):
             return False
         
     def run(self):
+        """
+        A pipeline to run and the scanning algorithm
+
+        :return: A dictionary containing the information of web form elements
+        :rtype: dict
+        """
         results = []
         for el in self.form_elements():
             el_type = self.find_input_type(el)

@@ -1,3 +1,7 @@
+"""
+Contains wrapper class from selenium webdriver
+"""
+
 import re
 import os
 from typing import Literal
@@ -12,6 +16,15 @@ from datetime import datetime
 extract_number_pattern = re.compile(r"\D*(\d*)\D*")
 
 class Driver():
+	"""
+	A wrapper class that sets up the selenium webdriver with desired options and
+	some helper functions for routine tasks (such as taking screenshots)
+
+	:param logger: Instance of python's Logger object
+	:type logger: Logger
+	:param debug_address: Is in the form of host:port
+	:type debug_address: str
+	"""
 	def __init__(
 			self,
 			logger:Logger | None = None,
@@ -22,6 +35,7 @@ class Driver():
 			driver_logging:bool = True,
 			user_data_dir:str|None = None
 			) -> None:
+
 		self.driver_logging = driver_logging
 		self.driver_options = {
 			"disable_extension": disable_extension,

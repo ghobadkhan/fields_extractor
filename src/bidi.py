@@ -50,6 +50,8 @@ class Bidi:
         After the script is created, the tag id is set to be an auto-generated
         UUID. The consumer must keep this UUID to remove it later
 
+        :param script: JS script
+        :type script: string
         :return: UUID of that script
         :rtype: str
         """
@@ -65,6 +67,10 @@ class Bidi:
 
 
     def create_output_node(self):
+        """
+        Creates a 'hidden' text area, so the output of script can be saved and
+        picked up by the code.
+        """
         script = f"""
             res = document.createElement('textarea')
             res.setAttribute('id','{self.output_node_id}')
@@ -75,6 +81,12 @@ class Bidi:
         self.driver.execute_script(script)
     
     def destroy_node(self,*ids):
+        """
+        Deletes scripts that are created previously.
+
+        :param ids: A tuple of one or more UUIDs corresponding to the present scripts
+        :type ids: tuple(str)
+        """
         script = f"""
             el = document.getElementById(arguments[0])
             el.remove()
@@ -82,36 +94,11 @@ class Bidi:
         for id in ids:
             self.driver.execute_script(script,id)
 
-    def create_mutation_observer(self):
-        script = """
-            const callback = (mutationList, observer) => {
-                for (const mutation of mutationList) {
-                        if (mutation.type === 'childList') {
-                            console.log('A child node has been added or removed: '+ mutation.addedNodes[0]);
-                            if (mutation.addedNodes.length > 0 && mutation.addedNodes[0].innerText){
-                                res = document.getElementById('%s')
-                                res.innerHTML = mutation.addedNodes[0].innerText
-                        }
-                    }
-                }
-            };
-            const observer = new MutationObserver(callback);
-        """ %(self.output_node_id)
-        uid = self.inject_script(script)
-        # self.driver.execute_script(script,self.output_node_id)
-        return uid
-        
-
-    def start_mutation_observer(self,target:str="body"):
-        script = """
-            const targetNode = document.getElementsByTagName('%s');
-            const config = { attributes: true, childList: true, subtree: true };
-            // Start observing the target node for configured mutations
-            observer.observe(targetNode[0], config);
-        """ % (target)
-        uid = self.inject_script(script)
-        return uid
-
     def get_raw_output(self):
+        """
+        Reads the content of the hidden text area and returns it
+
+        :rtype: str
+        """
         el = self.driver.find_element(By.ID,self.output_node_id)
         return el.get_attribute('innerHTML')
