@@ -18,4 +18,5 @@ a different project at later stages.
    :caption: Contents:
    
    Home <self>
+   Installation <installation.rst>
    Usage <usage.rst>

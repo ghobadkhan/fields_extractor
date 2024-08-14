@@ -40,7 +40,7 @@ intersphinx_mapping = {
 intersphinx_disabled_domains = ["std"]
 
 templates_path = ['_templates']
-exclude_patterns = ["build"]
+exclude_patterns = ["build","dags"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -49,6 +49,7 @@ exclude_patterns = ["build"]
 html_theme = 'sphinx_pdj_theme'
 html_theme_path = [sphinx_pdj_theme.get_html_theme_path()]
 html_static_path = ['_static']
+
 autoapi_dirs = ['../../src']
 autoapi_options =  [
     'members',
@@ -58,3 +59,4 @@ autoapi_options =  [
     'special-members',
     'imported-members'
     ]
+autoapi_ignore = ["*dag*"]
