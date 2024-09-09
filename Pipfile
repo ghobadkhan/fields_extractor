@@ -50,11 +50,17 @@ tzdata = "==2024.1"
 webdriver-manager = "==4.0.2"
 websocket-client = "==1.8.0"
 wsproto = "==1.2.0"
-urllib3 = {extras = ["socks"], version = "==2.2.2"}
-apache-airflow = {extras = ["celery"], version = "==2.9.3"}
+urllib3 = {extras = ["socks"] }
 docutils = "*"
+grpcio = "*"
+grpcio-tools = "*"
 
 [dev-packages]
+ipykernel = "*"
+
+[airflow]
+apache-airflow = {extras = ["celery"], version = "==2.10.1"}
+psycopg2-binary = "==2.9.9"
 
 [requires]
 python_version = "3.10"

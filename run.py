@@ -60,9 +60,9 @@ class Runner(metaclass=Singleton):
 			routine
 			.goto_url().pause(2).sign_in().pause(3).refresh()
 			.pause(5).my_information().pause(1)
-			.find_click_submit_btn().pause(5).my_experience()
+			.submit_or_next().pause(5).my_experience()
 		)
-		routine.find_click_submit_btn().pause(5).my_experience(selected_sections=["files"])
+		routine.submit_or_next().pause(5).my_experience(selected_sections=["files"])
 
 	def test_observe_page_mutation(self):
 		load_dotenv()

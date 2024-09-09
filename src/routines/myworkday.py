@@ -72,7 +72,7 @@ class Routine:
         self._fill_my_information()
         return self
     
-    def find_click_submit_btn(self):
+    def submit_or_next(self):
         self._find_submit_or_next_btn().click()
         return self
     

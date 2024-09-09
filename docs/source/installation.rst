@@ -55,7 +55,7 @@ in the virtual environment, created by ``Pipenv``:
    b. ``AIRFLOW__CORE__DAGS_FOLDER="path/to/project/dags/folder"``
 
 .. 
-    You need 3 spaces before a nested item, not a tab!
+    (Above) You need 3 spaces before a nested item, not a tab!
 ..
 
 2. Switch to pipenv venv using ``pipenv shell``.

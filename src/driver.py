@@ -34,7 +34,7 @@ class Driver():
 			debug_address:str|None=None,
 			driver_logging:bool = True,
 			user_data_dir:str|None = None
-			) -> None:
+			):
 
 		self.driver_logging = driver_logging
 		self.driver_options = {
@@ -44,8 +44,8 @@ class Driver():
 			"debug_address": debug_address,
 			"user_data_dir": user_data_dir
 		}
-		self.driver = self.setup_webdriver(**self.driver_options)
 		self.logger = logger if logger else getLogger()
+		return self.setup_webdriver(**self.driver_options)
 
 
 	def re_init_driver(self):
@@ -99,36 +99,3 @@ class Driver():
 				raise Exception("RETRY","Connecting Internet")
 			else:
 				raise Exception("Webdriver Exception:",e.msg)
-
-	def take_screenshot(self,file_type:Literal["b64","png"]="b64"):
-		img_file_name = f"{datetime.now().isoformat(timespec='seconds')}"
-		folder = os.environ["SCREENSHOT_FOLDER"]
-		match file_type:
-			case "b64":
-				img = self.driver.get_screenshot_as_base64()
-				open(f"{folder}/{img_file_name}.b64","w").write(img)
-			case "png":
-				img = self.driver.get_screenshot_as_png()
-				open(f"{folder}/{img_file_name}.png","wb").write(img)
-			case _:
-				self.logger.error(f"Invalid file_type chosen for screenshot ({file_type}).")
-				return False
-		self.logger.debug(f"Screenshot taken: {img_file_name}.{file_type}")
-		return True
-	
-	def find_elements(self,value:str,by:Literal["ID","XPATH","CLASS"]="XPATH",just_one:bool=True):
-		match by:
-			case "ID":
-				sby = By.ID
-			case "XPATH":
-				sby = By.XPATH
-			case "CLASS":
-				sby = By.CLASS_NAME
-			case _:
-				raise Exception("Unexpected 'by' value is entered")
-		els = self.driver.find_elements(by=sby,value=value)
-		if len(els) > 0:
-			if just_one:
-				return els[0]
-			return els
-		return None

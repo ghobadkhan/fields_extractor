@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package WebDriverServiceInterface;
+
+// python -m grpc_tools.protoc -Isrc/webdriver_service/build=src/webdriver_service --python_out=. --pyi_out=. --grpc_python_out=. src/webdriver_service/interface.proto
+
+
+message URL {
+    string url = 1;
+}
+
+message ServiceResponse {
+    StatusType status = 1;
+    optional string message = 2;
+    optional string exception = 3;
+    
+    enum StatusType {
+        STATUS_OK = 0;
+        STATUS_FAILURE = 1;
+    }
+}
+
+message DriverOptions {
+    bool headless = 1;
+    int32 load_timeout = 2;
+    bool disable_extension = 3;
+    string debug_address = 4;
+    bool driver_logging = 5;
+    string user_data_dir = 6;
+}
+
+message Empty {
+
+}
+
+service WebDriver {
+    rpc start_driver (DriverOptions) returns (ServiceResponse) {}
+    rpc get_url (URL) returns (ServiceResponse) {}
+    rpc refresh (Empty) returns (ServiceResponse) {}
+    rpc stop_driver (Empty) returns (ServiceResponse) {}
+}
