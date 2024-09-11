@@ -5,12 +5,9 @@ import yaml
 from logging import Logger, config, getLogger
 from pathlib import Path
 from src.bidi import Bidi
-from src.db import DB
-from src.contracts import JobData, Singleton
-from src.driver import Driver
 from dotenv import load_dotenv
 from src.routines.myworkday import Routine
-from selenium.webdriver import Keys, ActionChains
+from selenium.webdriver import Keys, ActionChains, Chrome
 from time import sleep
 
 
@@ -23,10 +20,9 @@ logging_config_file_name = "src/logging_local.yml"
 with open(logging_config_file_name, 'r') as logging_config_file:
 	config.dictConfig(yaml.load(logging_config_file, Loader=yaml.FullLoader))
 
-class Runner(metaclass=Singleton):
+class Runner:
 	_logger: Logger
-	_job_data: JobData
-	_driver: Driver
+	_driver: Chrome
 	_bidi: Bidi
 
 	def __init__(self):
@@ -39,10 +35,9 @@ class Runner(metaclass=Singleton):
 			]:
 			Path(folder).mkdir(exist_ok=True)
 		self._logger = getLogger("extract")
-		# Initialize database
-		self._job_data = DB(db_name=os.environ["DB_NAME"],output_folder=os.environ['OUTPUT_FOLDER'])
+
 		# Initialize webdriver
-		self._driver = Driver(load_timeout=-1, driver_logging=False,debug_address="localhost:9222")
+		# self._driver = Driver(load_timeout=-1, driver_logging=False,debug_address="localhost:9222")
 	
 
 	def run_extractor(self):
@@ -54,7 +49,7 @@ class Runner(metaclass=Singleton):
 	def test_fill_form(self):
 		load_dotenv()
 		# driver.driver.implicitly_wait(10)
-		routine = Routine(self._driver.driver,
+		routine = Routine(self._driver,
 				"https://td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers/job/Toronto%2C-Ontario/Sr-Software-Engineer--ETrading--ION_R_1346079/apply/applyManually")
 		(
 			routine
@@ -66,7 +61,7 @@ class Runner(metaclass=Singleton):
 
 	def test_observe_page_mutation(self):
 		load_dotenv()
-		self._bidi = Bidi(self._driver.driver)
+		self._bidi = Bidi(self._driver)
 
 		# Inject a mutation observer script
 		script = """

@@ -1,0 +1,46 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Compile proto",
+            "type": "shell",
+            "command": "pipenv",
+            "args": [
+                "run",
+                "python",
+                "-m",
+                "grpc_tools.protoc",
+                "-Isrc/webdriver_service/build=src/webdriver_service",
+                "--python_out=.",
+                "--pyi_out=.",
+                "--grpc_python_out=.",
+                "src/webdriver_service/${input:protoFileName}.proto"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                // The following only works if you have activated 'Tasks' extension
+                "statusbar": {
+                    "label" : "compile proto",
+                    "icon": {
+                        "id": "light-bulb"
+                    }
+                }
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "protoFileName",
+            "description": "Enter the name of you .proto file (without extension)",
+            "default": "interface"
+        }
+    ],
+    "statusbar.default.hide": false,
+    "statusbar.limit": 2,
+    "statusbar.select.color": "",
+    "statusbar.select.label": "task:"
+}

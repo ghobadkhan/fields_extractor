@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/struct.proto";
+
 package WebDriverServiceInterface;
 
 // python -m grpc_tools.protoc -Isrc/webdriver_service/build=src/webdriver_service --python_out=. --pyi_out=. --grpc_python_out=. src/webdriver_service/interface.proto
@@ -29,8 +31,15 @@ message DriverOptions {
     string user_data_dir = 6;
 }
 
-message Empty {
+message Credentials {
+    string username = 1;
+    string password = 2;
+}
 
+message Empty {}
+
+message Flex {
+    google.protobuf.Struct additionalInfo = 1;
 }
 
 service WebDriver {
@@ -38,4 +47,5 @@ service WebDriver {
     rpc get_url (URL) returns (ServiceResponse) {}
     rpc refresh (Empty) returns (ServiceResponse) {}
     rpc stop_driver (Empty) returns (ServiceResponse) {}
+    rpc sign_in (Credentials) returns (ServiceResponse) {}
 }
