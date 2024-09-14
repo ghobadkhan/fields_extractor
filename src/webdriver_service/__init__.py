@@ -3,23 +3,30 @@ import grpc
 import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
+from typing import Callable
 
 from .build import interface_pb2_grpc as pb2_grpc
 from .build import interface_pb2 as pb2
 from .service import WebdriverService, logger
+from .interface import ServiceResponse
 
 
 # In case GRPC_PORT is not set in .env
 FALLBACK_GRPC_PORT = "43321"
 
-def webdriver_client(func):
-	channel = grpc.insecure_channel(f"localhost:{os.environ['GRPC_PORT']}")
-	@wraps(func)
-	def wrapper(*args, **kwargs):
-		with channel:
-			stub = pb2_grpc.WebDriverStub(channel=channel)
-			return func(*args,**kwargs, stub=stub)
-	return wrapper
+def client(log_response = True):
+	def decorator(func:Callable[...,ServiceResponse]):
+		channel = grpc.insecure_channel(f"localhost:{os.environ['GRPC_PORT']}")
+		@wraps(func)
+		def wrapper(*args, **kwargs):
+			with channel:
+				stub = pb2_grpc.WebDriverStub(channel=channel)
+				resp = func(*args,**kwargs, stub=stub)
+				if log_response:
+					logger.info(f"status: {resp.status}")
+				return resp
+		return wrapper	
+	return decorator
 
 def serve():
 	server=grpc.server(ThreadPoolExecutor(max_workers=5))

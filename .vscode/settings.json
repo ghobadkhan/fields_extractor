@@ -1,5 +1,6 @@
 {
     "cSpell.enableFiletypes": [
         "proto3"
-    ]
+    ],
+    "python.analysis.autoImportCompletions": false
 }

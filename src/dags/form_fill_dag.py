@@ -22,7 +22,8 @@ from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
 from airflow.models.dagrun import DagRun
 from airflow.models.taskinstance import TaskInstance
 
-from driver import Driver
+from src import webdriver_client as client
+
 # from .myworkday import Routine    
 
 logger = logging.getLogger("airflow.task")
@@ -31,7 +32,6 @@ logger = logging.getLogger("airflow.task")
 #     driver.driver,
 #     "https://td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers/job/Toronto%2C-Ontario/Sr-Software-Engineer--ETrading--ION_R_1346079/apply/applyManually")
 
-dw = Driver.singleton(load_timeout=-1, headless=False,driver_logging=False)
 with DAG(
     dag_id="form_fill_dag_1",
     dag_display_name="Fill the webforms!",
@@ -41,27 +41,26 @@ with DAG(
     start_date=pendulum.now(),
     catchup=False,
     tags=["fields_extractor", "arian"],
-    # params={
-    #     "current_line": Param(default=-1,type="integer",readOnly=True),
-    #     "payload": Param("Say Something",type="string"),
-    #     "test":"hello"
-    # }
+    params={
+        "url": Param("https://www.yahoo.com",type="string")
+    }
 ) as dag:
     
+    @task()
+    def start_driver():
+        client.start_driver()
     
     @task()
-    def get_url():
-        dw.driver_get_link("https://www.google.com")
-    
+    def get_url(**kwargs):
+        client.get_url(kwargs["params"]["url"])
     @task()
-    def refresh():
-        dw.driver.refresh()
-
+    def screenshot():
+        client.screenshot()
     @task()
     def close():
-        dw.driver.close()
+        client.quit()
 
-    get_url() >> refresh() >> close()
+    start_driver() >> get_url() >> screenshot() >> close()
 
 
 if __name__ == "__main__":

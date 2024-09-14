@@ -24,21 +24,23 @@ with grpc.insecure_channel(f"localhost:{os.environ['GRPC_PORT']}") as channel:
 """
 
 from __future__ import annotations
+from datetime import datetime
 import logging
 import os
 from time import sleep
 import grpc
 
-from typing import Callable
+from typing import Callable, Literal, Optional, Tuple, Union
 from functools import wraps
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver import Keys, ActionChains, Chrome, ChromeService
+from google.protobuf.struct_pb2 import Struct
 
 from .build import interface_pb2 as pb2
 from .build.interface_pb2_grpc import WebDriverServicer
-from src.webdriver_service.dataclasses import DriverOptions, Credentials
+from src.webdriver_service import interface
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,7 @@ def catch(message: str|None = None):
 				return func(*args,**kwargs)
 			except Exception as e:
 				return pb2.ServiceResponse(
-					status=pb2.ServiceResponse.STATUS_FAILURE,
+					status=pb2.StatusType.STATUS_FAILURE,
 					message=message,
 					exception=str(e)
 				)
@@ -63,32 +65,43 @@ class WebdriverService(WebDriverServicer):
 	
 	@catch(message="Couldn't start the webdriver.")
 	def start_driver(self, request: pb2.DriverOptions, context):
-		driver_options = DriverOptions.from_message(request)
+		driver_options = interface.DriverOptions.from_message(request)
 		self._driver = self._setup_webdriver(driver_options)
-		return pb2.ServiceResponse(status=pb2.ServiceResponse.STATUS_OK)
+		return pb2.ServiceResponse(status=pb2.StatusType.STATUS_OK)
 
 	@catch(message="Couldn't get the url.")
-	def get_url(self, request: pb2.URL, context):
+	def get_url(self, request: pb2.WebdriverRequest, context):
 		self.driver.get(request.url)
-		return pb2.ServiceResponse(status=pb2.ServiceResponse.STATUS_OK)
+		return pb2.ServiceResponse(status=pb2.StatusType.STATUS_OK)
 	
 	@catch(message="Couldn't refresh.")
 	def refresh(self, request: pb2.Empty, context):
 		self.driver.refresh()
-		return pb2.ServiceResponse(status=pb2.ServiceResponse.STATUS_OK)
+		return pb2.ServiceResponse(status=pb2.StatusType.STATUS_OK)
 	
 	@catch(message="Sign in failure!")
 	def sign_in(self, request: pb2.Credentials, context):
-		credentials = Credentials.from_message(request)
+		credentials = interface.Credentials.from_message(request)
 		self._perform_sign_in(credentials)
-		return pb2.ServiceResponse(status=pb2.ServiceResponse.STATUS_OK)
+		return pb2.ServiceResponse(status=pb2.StatusType.STATUS_OK)
 
 	
 	@catch(message="Webdriver stop failed.")
 	def stop_driver(self, request: pb2.Empty, context):
 		self.driver.quit()
 		del self._driver
-		return pb2.ServiceResponse(status=pb2.ServiceResponse.STATUS_OK)
+		return pb2.ServiceResponse(status=pb2.StatusType.STATUS_OK)
+	
+	@catch(message="Screenshot failed.")
+	def take_screenshot(self, request: pb2.Empty, context):
+		img,name = self._take_screenshot()
+		response = interface.ServiceResponse(
+			status=interface.StatusType.STATUS_OK,
+			payload=interface.Payload(images={
+				name:img
+			})
+		)
+		return response.to_message()
 
 
 	@property
@@ -97,7 +110,7 @@ class WebdriverService(WebDriverServicer):
 			raise ValueError("Webdriver is not initialized")
 		return self._driver
 
-	def _setup_webdriver(self,ops:DriverOptions):
+	def _setup_webdriver(self,ops:interface.DriverOptions):
 		#TODO: Load options from a file or other external source
 		webdriver_options = Options()
 		if ops.debug_address is None:
@@ -122,7 +135,7 @@ class WebdriverService(WebDriverServicer):
 			driver.set_page_load_timeout(ops.load_timeout)
 		return driver
 	
-	def _perform_sign_in(self, creds:Credentials):
+	def _perform_sign_in(self, creds:interface.Credentials):
 			sign_in_form = self.driver.find_element("xpath","//form[contains(@data-automation-id,'signInFormo')]")
 			labels = sign_in_form.find_elements("xpath",".//label")
 			for label in labels:
@@ -138,5 +151,26 @@ class WebdriverService(WebDriverServicer):
 				sleep(0.5)
 			btn = sign_in_form.find_element("xpath",".//div[contains(@data-automation-id,'click_filter')]")
 			ActionChains(self.driver).move_to_element(btn).pause(0.5).send_keys(Keys.ENTER).pause(0.5).click().perform()
+
+
+	def _take_screenshot(self,file_type:Literal["b64","png"]="png", save=False
+					) -> Tuple[bytes,str]:
+		
+		img_file_name = f"scrshot-{datetime.now().isoformat(timespec='seconds')}"
+		folder = os.environ["SCREENSHOT_FOLDER"]
+		match file_type:
+			case "b64":
+				img = self.driver.get_screenshot_as_base64()
+				if save:
+					open(f"{folder}/{img_file_name}.b64","w").write(img)
+				img = img.encode()
+			case "png":
+				img = self.driver.get_screenshot_as_png()
+				if save:
+					open(f"{folder}/{img_file_name}.png","wb").write(img)
+			case _:
+				raise ValueError(f"Invalid file_type chosen for screenshot ({file_type}).")
+		logger.debug(f"Screenshot taken: {img_file_name}.{file_type}")
+		return img, img_file_name
 	
 

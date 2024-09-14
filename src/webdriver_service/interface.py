@@ -1,13 +1,41 @@
 
 from __future__ import annotations
 
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, fields, MISSING
-from typing import List, Optional, Type, TypeVar, Generic, get_args
+from enum import Enum, EnumMeta
+from typing import Dict, List, Optional, Type, TypeVar, Generic, get_args, get_type_hints, MutableMapping, cast
 from google.protobuf.message import Message
+from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 
 from .build import interface_pb2 as pb2
 
+
 T = TypeVar('T', bound=Message)
+E = TypeVar('E')
+
+class ABCEnum(ABCMeta, EnumMeta):
+    def __new__(mcls, *args, **kw):
+        abstract_enum_cls = super().__new__(mcls, *args, **kw)
+        # Only check abstractions if members were defined.
+        if abstract_enum_cls._member_map_:
+            try:  # Handle existence of undefined abstract methods.
+                absmethods = list(abstract_enum_cls.__abstractmethods__)
+                if absmethods:
+                    missing = ', '.join(f'{method!r}' for method in absmethods)
+                    plural = 's' if len(absmethods) > 1 else ''
+                    raise TypeError(
+                       f"cannot instantiate abstract class {abstract_enum_cls.__name__!r}"
+                       f" with abstract method{plural} {missing}")
+            except AttributeError:
+                pass
+        return abstract_enum_cls
+	
+class BaseEnum(Enum, metaclass=ABCEnum):
+	@abstractmethod
+	def get_proto_enum(self): ...
+
+
 
 @dataclass
 class BaseData(Generic[T]):
@@ -16,13 +44,22 @@ class BaseData(Generic[T]):
 		"""
 		Dataclass to Protobuf Message
 		"""
-		message:T = self._get_T()()
-		self._check_fields_consistency(message)
+		message_class:Type[T] = self._get_T()
+		
+		kw = {}
 		for f in fields(self):
 			val = getattr(self,f.name)
 			if f.type == "Optional[str]" and val is None:
 				val = ""
-			setattr(message,f.name,val)
+			elif issubclass(type(val),BaseEnum):
+				v = cast(BaseEnum,val)
+				e = v.get_proto_enum()
+				val = getattr(e,v.name)
+			elif issubclass(type(val),BaseData):
+				val = val.to_message()
+			kw[f.name] = val
+		message = message_class(**kw)
+		self._check_fields_consistency(message)
 		return message
 	
 	@classmethod
@@ -84,7 +121,15 @@ class BaseData(Generic[T]):
 				missing_required.append(f.name)
 		if len(missing_required) > 0:
 			raise ValueError(f"Missing required fields: {'-'.join(missing_required)}")
-		
+	
+	@classmethod
+	def _get_field_type(cls,f_name:str):
+		type_hint = get_type_hints(cls)[f_name]
+		type_args = get_args(type_hint)
+		if len(type_args) > 0:
+			return type_args[0]
+		return type_hint
+	
 	@classmethod
 	def _get_message_values(cls, m:Message):
 		"""
@@ -96,11 +141,29 @@ class BaseData(Generic[T]):
 		"""
 		kwargs = {}
 		for descriptor, value in m.ListFields():
-			if descriptor.type == str and value == "":
+			if descriptor.type == descriptor.TYPE_ENUM:
+				# Convert proto enum to python Enum
+				enum_class: Type[BaseEnum] = cls._get_field_type(descriptor.name)
+				value = enum_class(value=value)
+			elif issubclass(type(value),Message):
+				# The message contains another message which in turn should be
+				# mapped to another dataclass
+				d_class:Type[BaseData] = cls._get_field_type(descriptor.name)
+				value = d_class.from_message(value)
+			elif descriptor.type == descriptor.TYPE_STRING and value == "":
 				value = None
+			elif issubclass(type(value),MutableMapping):
+				value = dict(value)
 			kwargs[descriptor.name] = value
 		return kwargs
 
+
+class StatusType(BaseEnum):
+	STATUS_OK = 0
+	STATUS_FAILURE = 1
+
+	def get_proto_enum(self):
+		return pb2.StatusType
 
 @dataclass
 class DriverOptions(BaseData[pb2.DriverOptions]):
@@ -115,3 +178,23 @@ class DriverOptions(BaseData[pb2.DriverOptions]):
 class Credentials(BaseData[pb2.Credentials]):
 	username:str
 	password: str
+
+@dataclass
+class Payload(BaseData[pb2.Payload]):
+	images: Optional[Dict[str,bytes]] = None
+
+@dataclass
+class ServiceResponse(BaseData[pb2.ServiceResponse]):
+	status: StatusType = StatusType.STATUS_OK
+	message: Optional[str] = None
+	exception: Optional[str] = None
+	payload: Optional[Payload] = None
+
+@dataclass
+class WebdriverRequest(BaseData[pb2.WebdriverRequest]):
+	url: Optional[str] = None
+
+@dataclass
+class Empty(BaseData[pb2.Empty]): ...
+
+
