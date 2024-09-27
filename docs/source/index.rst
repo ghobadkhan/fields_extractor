@@ -20,3 +20,4 @@ a different project at later stages.
    Home <self>
    Installation <installation.rst>
    Usage <usage.rst>
+   Extraction of Fields <fields_extraction.rst>
