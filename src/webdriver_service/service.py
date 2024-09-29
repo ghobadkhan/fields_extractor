@@ -38,8 +38,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver import Keys, ActionChains, Chrome, ChromeService
 from google.protobuf.struct_pb2 import Struct
 
-from .build import interface_pb2 as pb2
-from .build.interface_pb2_grpc import WebDriverServicer
+from src.webdriver_service.build import interface_pb2 as pb2
+from src.webdriver_service.build.interface_pb2_grpc import WebDriverServicer
 from src.webdriver_service import interface
 
 logger = logging.getLogger(__name__)

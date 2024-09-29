@@ -42,6 +42,9 @@ intersphinx_disabled_domains = ["std"]
 templates_path = ['_templates']
 exclude_patterns = ["build","dags"]
 
+#This is a sphinx option. I suppressed auto api complaining about import resolution
+suppress_warnings = ["autoapi.python_import_resolution", "autoapi.not_readable"]
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -59,4 +62,4 @@ autoapi_options =  [
     'special-members',
     'imported-members'
     ]
-autoapi_ignore = ["*dag*"]
+autoapi_ignore = ["*dag*","*build*"]

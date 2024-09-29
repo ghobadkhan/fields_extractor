@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Type, TypeVar, Generic, get_args, get_t
 from google.protobuf.message import Message
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 
-from .build import interface_pb2 as pb2
+from src.webdriver_service.build import interface_pb2 as pb2
 
 
 T = TypeVar('T', bound=Message)
